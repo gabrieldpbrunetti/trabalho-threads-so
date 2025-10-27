@@ -12,17 +12,17 @@
 #define TAMANHO_MACROBLOCO_COLUNA 3
 #define TAMANHO_MACROBLOCO_LINHA 3
 
-typedef struct {
+typedef struct matrix {
     int **data;
     int rows, cols;
 } Matrix;
 
-typedef struct {
+typedef struct macro_bloco {
     int **matrix_data;
     int comeco_linha, fim_linha, comeco_coluna, fim_coluna;
 } Macrobloco;
 
-typedef struct {
+typedef struct thread_ctx {
     Macrobloco *blocos;
     int total_blocos;
     int *proximo_bloco_id;
@@ -177,6 +177,7 @@ int busca_paralela(Matrix *m, const int tamanho_macrobloco_linha, const int tama
     pthread_mutex_init(&mutex_contador, NULL);
 
     ThreadCtx ctx;
+
     ctx.blocos = blocos;
     ctx.total_blocos = total_blocos;
     ctx.proximo_bloco_id = &proximo_bloco_id;
@@ -215,26 +216,21 @@ int main() {
     srand(2004);
     struct timespec comeco_paralelo, fim_paralelo, comeco_serial, fim_serial;
 
-    Matrix *matrix = init_matrix(LINHAS, COLUNAS);
-    if (!matrix) {
-        perror("Erro ao alocar matriz");
-        return EXIT_FAILURE;
-    }
-    matrix_inserir_numeros_aleatorios(matrix);
+    Matrix *m = criar_matrix_aleatoria(LINHAS, COLUNAS);
 
     clock_gettime(CLOCK_MONOTONIC, &comeco_serial);
-    int r1 = busca_serial(matrix);
+    int r1 = busca_serial(m);
     clock_gettime(CLOCK_MONOTONIC, &fim_serial);
 
     double tempo_serial = (fim_serial.tv_sec - comeco_serial.tv_sec) + (fim_serial.tv_nsec - comeco_serial.tv_nsec) / 1e9;
 
     clock_gettime(CLOCK_MONOTONIC, &comeco_paralelo);
-    int r2 = busca_paralela(matrix, TAMANHO_MACROBLOCO_LINHA, TAMANHO_MACROBLOCO_COLUNA);
+    int r2 = busca_paralela(m, TAMANHO_MACROBLOCO_LINHA, TAMANHO_MACROBLOCO_COLUNA);
     clock_gettime(CLOCK_MONOTONIC, &fim_paralelo);
 
     double tempo_paralelo = (fim_paralelo.tv_sec - comeco_paralelo.tv_sec) + (fim_paralelo.tv_nsec - comeco_paralelo.tv_nsec) / 1e9;
 
-    free_matrix(matrix);
+    free_matrix(m);
 
     printf("Busca serial: %d\nBusca Paralela: %d\n", r1, r2);
     printf("Tempo serial: %lf\nTempo paralelo: %lf\n", tempo_serial, tempo_paralelo);
