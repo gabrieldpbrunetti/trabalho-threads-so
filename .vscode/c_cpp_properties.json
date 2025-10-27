@@ -1,0 +1,16 @@
+{
+  "version": 4,
+  "configurations": [
+    {
+      "name": "Win64-GCC",
+      "intelliSenseMode": "windows-gcc-x64",
+      "compilerPath": "C:/msys64/mingw64/bin/gcc.exe",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "includePath": [
+        "${workspaceFolder}/**"
+      ],
+      "defines": []
+    }
+  ]
+}
