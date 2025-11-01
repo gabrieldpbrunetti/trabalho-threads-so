@@ -8,7 +8,7 @@
 #define LINHAS 10000
 #define COLUNAS 10000
 #define CORES 8
-#define THREADS 4
+#define THREADS 8
 #define TAMANHO_MACROBLOCO_COLUNA 1000
 #define TAMANHO_MACROBLOCO_LINHA 1000
 
@@ -47,22 +47,22 @@ void desalocar_ponteiros_matrix() {
 }
 
 void inicializar_matrix_aleatoria(const int rows, const int cols) {
-g_matrix.data = malloc(sizeof(int*) * rows);
-if (!g_matrix.data) return;
+    g_matrix.data = malloc(sizeof(int*) * rows);
+    if (!g_matrix.data) return;
 
-for (int i = 0; i < rows; i++) {
-        g_matrix.data[i] = malloc(sizeof(int) * cols);
-        if (!g_matrix.data[i])  {
-            for (int j = 0; j < i; j++) free(g_matrix.data[j]);
-            free(g_matrix.data);
-            return;
-        }
+    for (int i = 0; i < rows; i++) {
+            g_matrix.data[i] = malloc(sizeof(int) * cols);
+            if (!g_matrix.data[i])  {
+                for (int j = 0; j < i; j++) free(g_matrix.data[j]);
+                free(g_matrix.data);
+                return;
+            }
 
-        for (int k = 0; k < cols; k++) g_matrix.data[i][k] = rand() % 32000;
-}
+            for (int k = 0; k < cols; k++) g_matrix.data[i][k] = rand() % 32000;
+    }
 
-g_matrix.rows = rows;
-g_matrix.cols = cols;
+    g_matrix.rows = rows;
+    g_matrix.cols = cols;
 }
 
 
@@ -139,14 +139,20 @@ int busca_paralela_alocacao_dinamica(pthread_t *threads, const int thread_count,
     pthread_mutex_init(&g_mutex_fila, NULL);
     pthread_mutex_init(&g_mutex_contador, NULL);
 
-    ThreadCtx ctx = {
-        .total_blocos = total_blocos,
-        .bloco_tamanho_coluna = tamanho_macrobloco_coluna,
-        .bloco_tamanho_linha = tamanho_macrobloco_linha,
-        .blocos_por_coluna = n_colunas_bloco,
-        .blocos_por_linha = n_linhas_bloco
-    };
+    // ThreadCtx ctx = {
+    //     .total_blocos = total_blocos,
+    //     .bloco_tamanho_coluna = tamanho_macrobloco_coluna,
+    //     .bloco_tamanho_linha = tamanho_macrobloco_linha,
+    //     .blocos_por_coluna = n_colunas_bloco,
+    //     .blocos_por_linha = n_linhas_bloco
+    // };
 
+    ThreadCtx ctx;
+    ctx.total_blocos = total_blocos;
+    ctx.bloco_tamanho_coluna = tamanho_macrobloco_coluna;
+    ctx.bloco_tamanho_linha = tamanho_macrobloco_linha;
+    ctx.blocos_por_coluna = n_colunas_bloco;
+    ctx.blocos_por_linha = n_linhas_bloco;
     for (int i = 0; i < thread_count; i++)
         pthread_create(&threads[i], NULL, thread_worker, &ctx);
 
@@ -159,7 +165,7 @@ int busca_paralela_alocacao_dinamica(pthread_t *threads, const int thread_count,
     return g_contador_global;
 }
 
-int busca_paralela(const int tamanho_macrobloco_linha, const int tamanho_macrobloco_coluna, const int n_threads) {
+int busca_paralela(const int tamanho_macrobloco_linha, const int tamanho_macrobloco_coluna) {
     g_contador_global = 0;
     g_proximo_bloco = 0;
 
@@ -167,23 +173,30 @@ int busca_paralela(const int tamanho_macrobloco_linha, const int tamanho_macrobl
     const int n_colunas_bloco = ceil_div(g_matrix.cols, tamanho_macrobloco_coluna);
     const int total_blocos = n_colunas_bloco * n_linhas_bloco;
 
-    pthread_t threads[n_threads];
+    pthread_t threads[THREADS];
 
     pthread_mutex_init(&g_mutex_fila, NULL);
     pthread_mutex_init(&g_mutex_contador, NULL);
 
-    ThreadCtx ctx = {
-        .total_blocos = total_blocos,
-        .bloco_tamanho_coluna = tamanho_macrobloco_coluna,
-        .bloco_tamanho_linha = tamanho_macrobloco_linha,
-        .blocos_por_coluna = n_colunas_bloco,
-        .blocos_por_linha = n_linhas_bloco
-    };
+    // ThreadCtx ctx = {
+    //     .total_blocos = total_blocos,
+    //     .bloco_tamanho_coluna = tamanho_macrobloco_coluna,
+    //     .bloco_tamanho_linha = tamanho_macrobloco_linha,
+    //     .blocos_por_coluna = n_colunas_bloco,
+    //     .blocos_por_linha = n_linhas_bloco
+    // };
 
-    for (int i = 0; i < n_threads; i++)
+    ThreadCtx ctx;
+    ctx.total_blocos = total_blocos;
+    ctx.bloco_tamanho_coluna = tamanho_macrobloco_coluna;
+    ctx.bloco_tamanho_linha = tamanho_macrobloco_linha;
+    ctx.blocos_por_coluna = n_colunas_bloco;
+    ctx.blocos_por_linha = n_linhas_bloco;
+
+    for (int i = 0; i < THREADS; i++)
         pthread_create(&threads[i], NULL, thread_worker, &ctx);
 
-    for (int i = 0; i < n_threads; i++)
+    for (int i = 0; i < THREADS; i++)
         pthread_join(threads[i], NULL);
 
     pthread_mutex_destroy(&g_mutex_fila);
@@ -205,9 +218,9 @@ int busca_serial()  {
 }
 
 void benchmark() {
-    struct timespec comeco_paralelo, fim_paralelo, comeco_serial, fim_serial;
+    //struct timespec comeco_paralelo, fim_paralelo, comeco_serial, fim_serial;
 
-    FILE *output_file = fopen("./benchmark.csv", "w");
+    FILE *output_file = fopen("./benchmark3.csv", "w");
     if (!output_file) {
         puts("Erro ao abrir arquivo de output do benchmark");
         return;
@@ -215,6 +228,10 @@ void benchmark() {
 
     fprintf(output_file, "tamanho_matriz,tamanho_macrobloco,threads,tempo_serial,tempo_paralelo,speedup,eficiencia,resultado_serial,resultado_paralelo\n");
 
+
+    /*
+    CONFIGURE AQUI AS VARIÀVEIS PARA RODAR O BENCHMARK
+     */
     int tamanho_matrizes[] = {100, 1000, 3000, 5000, 8000, 10000};
     int tamanho_blocos[] = {10, 50, 100, 250, 500, 1000};
     int thread_count[] = {1, 2, 3, 4, 8, 12};
@@ -227,10 +244,24 @@ void benchmark() {
         int tamanho_matriz = tamanho_matrizes[i];
         inicializar_matrix_aleatoria(tamanho_matriz, tamanho_matriz);
 
+        /*
+        descomente o clock_gettime e a declaração de variáveis no topo da função se quiser rodar com ele
+        é mais preciso
+        */
+
+
+        /*
         clock_gettime(CLOCK_MONOTONIC, &comeco_serial);
         int resultado_serial = busca_serial();
         clock_gettime(CLOCK_MONOTONIC, &fim_serial);
         double tempo_serial = (fim_serial.tv_sec - comeco_serial.tv_sec) + (fim_serial.tv_nsec - comeco_serial.tv_nsec) / 1e9;
+        */
+
+        clock_t comeco_serial = clock();
+        int resultado_serial = busca_serial();
+        clock_t fim_serial  = clock();
+
+        double tempo_serial = ((double)(fim_serial - comeco_serial)) / CLOCKS_PER_SEC;
 
         for (int j = 0; j < n_tamanho_blocos; j ++) {
             int tamanho_bloco = tamanho_blocos[j];
@@ -238,11 +269,20 @@ void benchmark() {
 
                 int n_threads = thread_count[k];
                 pthread_t *threads = malloc(sizeof(pthread_t) * n_threads);
+
+                // Descomente aqui também
+                /*
                 clock_gettime(CLOCK_MONOTONIC, &comeco_paralelo);
                 int resultado_paralelo = busca_paralela_alocacao_dinamica(threads, n_threads, tamanho_bloco, tamanho_bloco);
                 clock_gettime(CLOCK_MONOTONIC, &fim_paralelo);
-
                 double tempo_paralelo = (fim_paralelo.tv_sec - comeco_paralelo.tv_sec) + (fim_paralelo.tv_nsec - comeco_paralelo.tv_nsec) / 1e9;
+                */
+
+                clock_t comeco_paralelo = clock();
+                int resultado_paralelo = busca_paralela_alocacao_dinamica(threads, n_threads, tamanho_bloco, tamanho_bloco);
+                clock_t fim_paralelo = clock();
+                double tempo_paralelo = ((double)(fim_paralelo - comeco_paralelo)) / CLOCKS_PER_SEC;
+
                 double speedup = tempo_serial / tempo_paralelo;
                 double eficiencia = speedup / n_threads;
 
@@ -251,23 +291,26 @@ void benchmark() {
                     tamanho_matriz, tamanho_bloco, n_threads, tempo_serial ,tempo_paralelo, speedup, eficiencia, resultado_serial, resultado_paralelo);
             }
         }
+        desalocar_ponteiros_matrix();
     }
+
     fclose(output_file);
 }
 
 int main() {
     srand(2004);
-    struct timespec comeco_paralelo, fim_paralelo, comeco_serial, fim_serial;
 
+    // DESCOMENTE ESSA LINHAS PARA RODAR UM BENCHMARK
     benchmark();
     return 0;
 
     inicializar_matrix_aleatoria(LINHAS, COLUNAS);
 
+    // MELHOR FORMA DE CALCULAR O TEMPO EM LINUX
+    /*
     clock_gettime(CLOCK_MONOTONIC, &comeco_serial);
     int r1 = busca_serial();
     clock_gettime(CLOCK_MONOTONIC, &fim_serial);
-
 
     clock_gettime(CLOCK_MONOTONIC, &comeco_paralelo);
     int r2 = busca_paralela(THREADS, TAMANHO_MACROBLOCO_LINHA, TAMANHO_MACROBLOCO_COLUNA);
@@ -275,10 +318,28 @@ int main() {
 
     double tempo_serial = (fim_serial.tv_sec - comeco_serial.tv_sec) + (fim_serial.tv_nsec - comeco_serial.tv_nsec) / 1e9;
     double tempo_paralelo = (fim_paralelo.tv_sec - comeco_paralelo.tv_sec) + (fim_paralelo.tv_nsec - comeco_paralelo.tv_nsec) / 1e9;
+
+    */
+
+    /*
+    clock não funciona muito bem, eu particularmente preferi com o clock_gettime
+    mas ele não compila com msvc, só no gcc
+    */
+
+    clock_t inicio_serial = clock();
+    int resultado_serial = busca_serial();
+    clock_t fim_serial = clock();
+    double tempo_serial = ((double)(fim_serial - inicio_serial)) / CLOCKS_PER_SEC;
+
+    clock_t inicio_paralelo = clock();
+    int resultado_paralelo = busca_paralela(TAMANHO_MACROBLOCO_LINHA, TAMANHO_MACROBLOCO_COLUNA);
+    clock_t fim_paralelo = clock();
+    double tempo_paralelo = ((double)(fim_paralelo - inicio_paralelo)) / CLOCKS_PER_SEC;
+
     double speedup = tempo_serial / tempo_paralelo;
     double eficiencia = speedup / THREADS;
 
-    printf("Busca serial: %d\nBusca paralela: %d\n\n", r1, r2);
+    printf("Busca serial: %d\nBusca paralela: %d\n\n", resultado_serial, resultado_paralelo);
     printf("Tempo serial: %lf\nTempo paralelo: %lf\n\n", tempo_serial, tempo_paralelo);
 
     printf("Speedup: %lf - Eficiencia: %lf\n", speedup, eficiencia);
